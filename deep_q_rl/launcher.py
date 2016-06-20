@@ -16,6 +16,8 @@ import ale_experiment
 import ale_agent
 import q_network
 
+import gym
+
 def process_args(args, defaults, description):
     """
     Handle the command line.
@@ -138,7 +140,9 @@ def process_args(args, defaults, description):
                         type=bool, default=defaults.CUDNN_DETERMINISTIC,
                         help=('Whether to use deterministic backprop. ' +
                               '(default: %(default)s)'))
-
+    parser.add_argument('--gym', dest="gym", type=bool, default=False, help=('Use Gym (instead of Ale.)'))
+    parser.add_argument('--gym-rom', dest="gym_rom", type=str, default="Breakout-v0", help=('Gym Rom `code`'))
+                        
     parameters = parser.parse_args(args)
     if parameters.experiment_prefix is None:
         name = os.path.splitext(os.path.basename(parameters.rom))[0]
@@ -189,14 +193,16 @@ def launch(args, defaults, description):
     ale = ale_python_interface.ALEInterface()
     ale.setInt('random_seed', rng.randint(1000))
 
-    if parameters.display_screen:
+    if parameters.display_screen and not parameters.gym:
         import sys
         if sys.platform == 'darwin':
             import pygame
             pygame.init()
             ale.setBool('sound', False) # Sound doesn't work on OSX
 
-    ale.setBool('display_screen', parameters.display_screen)
+    if not parameters.gym:
+        ale.setBool('display_screen', parameters.display_screen)
+    
     ale.setFloat('repeat_action_probability',
                  parameters.repeat_action_probability)
 
@@ -248,9 +254,22 @@ def launch(args, defaults, description):
                                               rng)
 
 
-    experiment.run()
-
-
-
+    if not parameters.gym:
+        experiment.run()
+    else:
+        env = gym.make(parameters.gym_rom)
+        g_experiment = ale_experiment.ALEExperiment(env.ale, agent,
+                                                    defaults.RESIZED_WIDTH,
+                                                    defaults.RESIZED_HEIGHT,
+                                                    parameters.resize_method,
+                                                    parameters.epochs,
+                                                    parameters.steps_per_epoch,
+                                                    parameters.steps_per_test,
+                                                    parameters.frame_skip,
+                                                    parameters.death_ends_episode,
+                                                    parameters.max_start_nullops,
+                                                    rng, env)
+        g_experiment.run()
+                                                    
 if __name__ == '__main__':
     pass

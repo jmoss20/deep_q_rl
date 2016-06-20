@@ -17,7 +17,7 @@ CROP_OFFSET = 8
 class ALEExperiment(object):
     def __init__(self, ale, agent, resized_width, resized_height,
                  resize_method, num_epochs, epoch_length, test_length,
-                 frame_skip, death_ends_episode, max_start_nullops, rng):
+                 frame_skip, death_ends_episode, max_start_nullops, rng, gym_env=None):
         self.ale = ale
         self.agent = agent
         self.num_epochs = num_epochs
@@ -40,6 +40,8 @@ class ALEExperiment(object):
         self.terminal_lol = False # Most recent episode ended on a loss of life
         self.max_start_nullops = max_start_nullops
         self.rng = rng
+
+        self.gym = gym_env
 
     def run(self):
         """
@@ -84,7 +86,10 @@ class ALEExperiment(object):
         the initial game state."""
 
         if not self.terminal_lol or self.ale.game_over():
-            self.ale.reset_game()
+            if not self.gym == None:
+                self.gym.reset()
+            else:
+                self.ale.reset_game()
 
             if self.max_start_nullops > 0:
                 random_actions = self.rng.randint(0, self.max_start_nullops+1)
@@ -103,7 +108,12 @@ class ALEExperiment(object):
         buffer
 
         """
-        reward = self.ale.act(action)
+        if not self.gym == None:
+            _, reward, _, _ = self.gym.step(action)
+        else:
+            reward = self.ale.act(action)
+        
+        
         index = self.buffer_count % self.buffer_length
 
         self.ale.getScreenGrayscale(self.screen_buffer[index, ...])
@@ -117,6 +127,9 @@ class ALEExperiment(object):
         reward = 0
         for _ in range(self.frame_skip):
             reward += self._act(action)
+
+        if not self.gym == None:
+            self.gym.render()
 
         return reward
 
